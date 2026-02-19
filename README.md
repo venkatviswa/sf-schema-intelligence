@@ -469,7 +469,6 @@ If you don't use `--org`, the sync script reads credentials from a `.env` file a
 | 1 | Done | Deterministic diff, ER diagrams, MCP tooling |
 | 2 | Planned | Domain auto-discovery via Louvain graph clustering |
 | 3 | Planned | Embedding-based rename detection (local, no API) |
-| 4 | Planned | ML severity classification for breaking changes |
 
 **Phase 2 — Domain Auto-Discovery:** Uses NetworkX + Louvain community detection to automatically group objects into business domains (Provider Network, Policy Management, Claims etc.) without any prior configuration. Useful on day one of a new engagement.
 
