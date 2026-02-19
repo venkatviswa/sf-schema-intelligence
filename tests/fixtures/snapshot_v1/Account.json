@@ -1,0 +1,36 @@
+{
+  "name": "Account",
+  "label": "Account",
+  "label_plural": "Accounts",
+  "custom": false,
+  "fields": [
+    {"name": "Id", "label": "Account ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Account Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "AccountNumber", "label": "Account Number", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Type", "label": "Type", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Prospect", "Customer", "Partner"]},
+    {"name": "Industry", "label": "Industry", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Healthcare", "Technology", "Finance"]},
+    {"name": "Phone", "label": "Phone", "type": "phone", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Website", "label": "Website", "type": "url", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Description", "label": "Description", "type": "textarea", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "BillingCity", "label": "Billing City", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "BillingState", "label": "Billing State", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "BillingPostalCode", "label": "Billing Zip", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "BillingCountry", "label": "Billing Country", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "ShippingCity", "label": "Shipping City", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "ShippingState", "label": "Shipping State", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "ShippingPostalCode", "label": "Shipping Zip", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "ShippingCountry", "label": "Shipping Country", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "AnnualRevenue", "label": "Annual Revenue", "type": "currency", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "NumberOfEmployees", "label": "Employees", "type": "int", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "OwnerId", "label": "Owner ID", "type": "reference", "required": true, "external_id": false, "reference_to": ["User"], "picklist_values": []},
+    {"name": "ParentId", "label": "Parent Account ID", "type": "reference", "required": false, "external_id": false, "reference_to": ["Account"], "picklist_values": []},
+    {"name": "CreatedDate", "label": "Created Date", "type": "datetime", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "LastModifiedDate", "label": "Last Modified Date", "type": "datetime", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "ExternalId__c", "label": "External ID", "type": "string", "required": false, "external_id": true, "reference_to": [], "picklist_values": []}
+  ],
+  "child_relationships": [
+    {"child_sobject": "Contact", "field": "AccountId", "relationship_name": "Contacts"},
+    {"child_sobject": "HealthCloudGA__CarePlan__c", "field": "HealthCloudGA__Account__c", "relationship_name": "CarePlans"},
+    {"child_sobject": "Account", "field": "ParentId", "relationship_name": "ChildAccounts"}
+  ]
+}

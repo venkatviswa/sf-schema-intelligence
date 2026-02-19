@@ -1,0 +1,19 @@
+{
+  "name": "Contact",
+  "label": "Contact",
+  "label_plural": "Contacts",
+  "custom": false,
+  "fields": [
+    {"name": "Id", "label": "Contact ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "FirstName", "label": "First Name", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "LastName", "label": "Last Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Email", "label": "Email", "type": "email", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Phone", "label": "Phone", "type": "phone", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "AccountId", "label": "Account ID", "type": "reference", "required": false, "external_id": false, "reference_to": ["Account"], "picklist_values": []},
+    {"name": "ReportsToId", "label": "Reports To ID", "type": "reference", "required": false, "external_id": false, "reference_to": ["Contact"], "picklist_values": []}
+  ],
+  "child_relationships": [
+    {"child_sobject": "HealthCloudGA__CarePlan__c", "field": "HealthCloudGA__Patient__c", "relationship_name": "PatientCarePlans"},
+    {"child_sobject": "Contact", "field": "ReportsToId", "relationship_name": "DirectReports"}
+  ]
+}

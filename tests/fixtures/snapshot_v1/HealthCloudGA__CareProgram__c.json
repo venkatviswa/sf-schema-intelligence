@@ -1,0 +1,15 @@
+{
+  "name": "HealthCloudGA__CareProgram__c",
+  "label": "Care Program",
+  "label_plural": "Care Programs",
+  "custom": true,
+  "fields": [
+    {"name": "Id", "label": "Record ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Program Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__Description__c", "label": "Description", "type": "textarea", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__Status__c", "label": "Status", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Active", "Inactive"]}
+  ],
+  "child_relationships": [
+    {"child_sobject": "HealthCloudGA__CarePlan__c", "field": "HealthCloudGA__CareProgram__c", "relationship_name": "CarePlans"}
+  ]
+}

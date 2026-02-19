@@ -1,0 +1,7 @@
+{
+  "synced_at": "2025-01-15T10:00:00+00:00",
+  "instance_url": "https://test-org.my.salesforce.com",
+  "objects_synced": 6,
+  "objects_failed": 0,
+  "api_version": "v60.0"
+}

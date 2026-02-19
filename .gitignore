@@ -1,0 +1,29 @@
+.env
+schema-cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+
+# Virtual environment
+.venv/
+
+# Lock file (regenerated from pyproject.toml)
+uv.lock
+
+# AI / session metadata
+.ai/
+.jbeval/
+.claude/
+
+# Generated outputs
+docs/
+workorder-er.md

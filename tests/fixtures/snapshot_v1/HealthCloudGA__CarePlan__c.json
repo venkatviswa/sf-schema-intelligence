@@ -1,0 +1,23 @@
+{
+  "name": "HealthCloudGA__CarePlan__c",
+  "label": "Care Plan",
+  "label_plural": "Care Plans",
+  "custom": true,
+  "fields": [
+    {"name": "Id", "label": "Record ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Care Plan Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__Account__c", "label": "Account", "type": "reference", "required": false, "external_id": false, "reference_to": ["Account"], "picklist_values": []},
+    {"name": "HealthCloudGA__Patient__c", "label": "Patient", "type": "reference", "required": true, "external_id": false, "reference_to": ["Contact"], "picklist_values": []},
+    {"name": "HealthCloudGA__CareProgram__c", "label": "Care Program", "type": "reference", "required": false, "external_id": false, "reference_to": ["HealthCloudGA__CareProgram__c"], "picklist_values": []},
+    {"name": "HealthCloudGA__Status__c", "label": "Status", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Draft", "Active", "Completed", "Cancelled"]},
+    {"name": "HealthCloudGA__StartDate__c", "label": "Start Date", "type": "date", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__EndDate__c", "label": "End Date", "type": "date", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__Description__c", "label": "Description", "type": "textarea", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__ParentCarePlan__c", "label": "Parent Care Plan", "type": "reference", "required": false, "external_id": false, "reference_to": ["HealthCloudGA__CarePlan__c"], "picklist_values": []}
+  ],
+  "child_relationships": [
+    {"child_sobject": "HealthCloudGA__CarePlanGoal__c", "field": "HealthCloudGA__CarePlan__c", "relationship_name": "Goals"},
+    {"child_sobject": "HealthCloudGA__CareTeamMember__c", "field": "HealthCloudGA__CarePlan__c", "relationship_name": "CareTeamMembers"},
+    {"child_sobject": "HealthCloudGA__CarePlan__c", "field": "HealthCloudGA__ParentCarePlan__c", "relationship_name": "ChildCarePlans"}
+  ]
+}

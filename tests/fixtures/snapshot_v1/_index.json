@@ -1,0 +1,8 @@
+[
+  {"name": "Account", "label": "Account", "custom": false, "field_count": 23},
+  {"name": "Contact", "label": "Contact", "custom": false, "field_count": 7},
+  {"name": "HealthCloudGA__CarePlan__c", "label": "Care Plan", "custom": true, "field_count": 10},
+  {"name": "HealthCloudGA__CarePlanGoal__c", "label": "Care Plan Goal", "custom": true, "field_count": 6},
+  {"name": "HealthCloudGA__CareProgram__c", "label": "Care Program", "custom": true, "field_count": 4},
+  {"name": "HealthCloudGA__CareTeamMember__c", "label": "Care Team Member", "custom": true, "field_count": 5}
+]

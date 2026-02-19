@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "sf-schema-intelligence"
+version = "0.1.0"
+description = "Salesforce Schema Intelligence — sync, explore, diff, and diagram Salesforce org schemas"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "networkx",
+    "requests",
+    "click",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+sf-schema = "cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

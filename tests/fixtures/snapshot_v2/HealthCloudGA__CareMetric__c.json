@@ -1,0 +1,15 @@
+{
+  "name": "HealthCloudGA__CareMetric__c",
+  "label": "Care Metric",
+  "label_plural": "Care Metrics",
+  "custom": true,
+  "fields": [
+    {"name": "Id", "label": "Record ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Metric Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__CarePlan__c", "label": "Care Plan", "type": "reference", "required": true, "external_id": false, "reference_to": ["HealthCloudGA__CarePlan__c"], "picklist_values": []},
+    {"name": "HealthCloudGA__Value__c", "label": "Value", "type": "double", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__Unit__c", "label": "Unit", "type": "string", "required": false, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__MeasuredDate__c", "label": "Measured Date", "type": "date", "required": false, "external_id": false, "reference_to": [], "picklist_values": []}
+  ],
+  "child_relationships": []
+}

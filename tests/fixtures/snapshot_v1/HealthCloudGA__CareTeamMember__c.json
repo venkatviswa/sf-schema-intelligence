@@ -1,0 +1,14 @@
+{
+  "name": "HealthCloudGA__CareTeamMember__c",
+  "label": "Care Team Member",
+  "label_plural": "Care Team Members",
+  "custom": true,
+  "fields": [
+    {"name": "Id", "label": "Record ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Member Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__CarePlan__c", "label": "Care Plan", "type": "masterdetail", "required": true, "external_id": false, "reference_to": ["HealthCloudGA__CarePlan__c"], "picklist_values": []},
+    {"name": "HealthCloudGA__Contact__c", "label": "Team Member Contact", "type": "reference", "required": false, "external_id": false, "reference_to": ["Contact"], "picklist_values": []},
+    {"name": "HealthCloudGA__Role__c", "label": "Role", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Primary Care Provider", "Specialist", "Care Coordinator", "Patient"]}
+  ],
+  "child_relationships": []
+}

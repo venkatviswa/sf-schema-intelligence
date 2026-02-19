@@ -1,0 +1,15 @@
+{
+  "name": "HealthCloudGA__CarePlanGoal__c",
+  "label": "Care Plan Goal",
+  "label_plural": "Care Plan Goals",
+  "custom": true,
+  "fields": [
+    {"name": "Id", "label": "Record ID", "type": "id", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "Name", "label": "Goal Name", "type": "string", "required": true, "external_id": false, "reference_to": [], "picklist_values": []},
+    {"name": "HealthCloudGA__CarePlan__c", "label": "Care Plan", "type": "masterdetail", "required": true, "external_id": false, "reference_to": ["HealthCloudGA__CarePlan__c"], "picklist_values": []},
+    {"name": "HealthCloudGA__Priority__c", "label": "Priority", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["High", "Medium", "Low"]},
+    {"name": "HealthCloudGA__Status__c", "label": "Status", "type": "picklist", "required": false, "external_id": false, "reference_to": [], "picklist_values": ["Not Started", "In Progress", "Completed"]},
+    {"name": "HealthCloudGA__TargetDate__c", "label": "Target Date", "type": "date", "required": false, "external_id": false, "reference_to": [], "picklist_values": []}
+  ],
+  "child_relationships": []
+}
