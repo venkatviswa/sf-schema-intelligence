@@ -12,7 +12,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 
 from src.core import diff, er_diagram, graph
-from src.data import schema_cache
+from src.data import schema_cache, sf_api
 
 CACHE_ROOT = os.environ.get("SF_SCHEMA_CACHE", "./schema-cache")
 
@@ -53,7 +53,8 @@ mcp = FastMCP(
         "Use list_orgs to see available orgs. Use switch_org to change the active org. "
         "ALWAYS call get_object_schema before writing Apex, SOQL, or Flow definitions. "
         "ALWAYS call generate_er_diagram (not freehand Mermaid) for ER diagrams. "
-        "Never assume field names or relationships — verify first."
+        "Never assume field names or relationships — verify first. "
+        "Use refresh_object to re-fetch a single object after schema changes in Salesforce."
     ),
 )
 
@@ -89,11 +90,51 @@ def switch_org(org: str) -> str:
 
 
 @mcp.tool
-def get_object_schema(object_name: str) -> str:
+def refresh_object(object_name: str) -> str:
+    """Re-fetch a single object's schema from Salesforce and update the cache.
+
+    Useful when you've just added or modified fields and need fresh metadata
+    without running a full sync.
+    """
+    # Find the active org alias from the registry
+    orgs = schema_cache.load_orgs(CACHE_ROOT)
+    cache_dir = _get_cache_dir()
+    org_alias = None
+    for alias, info in orgs.items():
+        if info["cache_dir"] == cache_dir:
+            org_alias = alias
+            break
+    if not org_alias:
+        return (
+            "Cannot refresh: no active org with sf CLI credentials. "
+            "Use 'python scripts/sf_schema_sync.py --org <alias>' from the terminal."
+        )
+    try:
+        instance_url, token = sf_api.get_session(org_alias)
+        raw = sf_api.describe_object(instance_url, token, object_name)
+    except RuntimeError as e:
+        return f"Refresh failed: {e}"
+    except Exception as e:
+        return f"Refresh failed (API error): {e}"
+
+    obj = sf_api.normalise(raw)
+    schema_cache.save_object(cache_dir, obj)
+    schema_cache.build_index(cache_dir)
+    field_count = len(obj.get("fields", []))
+    return (
+        f"Refreshed '{object_name}' from {org_alias} ({instance_url}). "
+        f"{field_count} fields, {len(obj.get('child_relationships', []))} child relationships."
+    )
+
+
+@mcp.tool
+def get_object_schema(object_name: str, key_fields_only: bool = False) -> str:
     """Return full field definitions and relationships for a Salesforce object."""
     obj = schema_cache.load_object(_get_cache_dir(), object_name)
     if not obj:
         return f"Object '{object_name}' not found in cache."
+    if key_fields_only:
+        return _format_object_key_fields(obj)
     return _format_object(obj)
 
 
@@ -199,6 +240,27 @@ def get_schema_meta(cache_dir: str | None = None) -> str:
 
 
 # ── Helpers (not tools) ──────────────────────────────────────────────────────
+
+def _format_object_key_fields(obj: dict) -> str:
+    """Format an object showing only key fields (Id, external IDs, relationships, required)."""
+    selected, truncated, total = er_diagram.select_fields(obj, field_filter="required", max_fields=20)
+    lines = [
+        f"Object: {obj['name']} ({obj['label']})",
+        f"Custom: {obj['custom']}",
+        f"\nKey Fields ({len(selected)} of {total} total):",
+    ]
+    for f in selected:
+        ref = f" -> {', '.join(f['reference_to'])}" if f.get("reference_to") else ""
+        req = " [REQUIRED]" if f.get("required") else ""
+        lines.append(f"  {f['name']} ({f['type']}){ref}{req}")
+    if truncated:
+        lines.append(f"\n  ... {total - len(selected)} more fields omitted. Use key_fields_only=False for full schema.")
+    if obj.get("child_relationships"):
+        lines.append(f"\nChild Relationships ({len(obj['child_relationships'])}):")
+        for r in obj["child_relationships"]:
+            lines.append(f"  <- {r['child_sobject']}.{r['field']} (rel: {r['relationship_name']})")
+    return "\n".join(lines)
+
 
 def _format_object(obj: dict) -> str:
     lines = [

@@ -16,20 +16,18 @@ Usage:
 """
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import click
-import requests
 from dotenv import load_dotenv
 
 # Allow running from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.data import sf_api
 from src.data.schema_cache import build_index, save_meta, save_object, load_orgs, save_orgs
 
 
@@ -44,41 +42,18 @@ def _get_session_for_org(org_alias: str | None = None) -> tuple[str, str, dict[s
         Tuple of (instance_url, access_token, org_info_dict).
     """
     if org_alias:
-        return _get_session_from_sf_cli(org_alias)
-    return _get_session_from_env()
-
-
-def _get_session_from_sf_cli(org_alias: str) -> tuple[str, str, dict[str, str]]:
-    """Get credentials from the Salesforce CLI."""
-    try:
-        result = subprocess.run(
-            ["sf", "org", "display", "-o", org_alias, "--json"],
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode != 0:
-            click.echo(f"ERROR: sf org display failed for '{org_alias}'.", err=True)
-            try:
-                err_data = json.loads(result.stdout)
-                click.echo(f"  {err_data.get('message', result.stderr)}", err=True)
-            except (json.JSONDecodeError, KeyError):
-                click.echo(f"  {result.stderr}", err=True)
+        try:
+            instance_url, access_token = sf_api.get_session(org_alias)
+        except RuntimeError as e:
+            click.echo(f"ERROR: {e}", err=True)
             raise SystemExit(1)
-        data = json.loads(result.stdout)["result"]
-        instance_url = data["instanceUrl"].rstrip("/")
-        access_token = data["accessToken"]
         org_info = {
             "alias": org_alias,
-            "username": data.get("username", ""),
+            "username": "",
             "instance_url": instance_url,
         }
         return instance_url, access_token, org_info
-    except FileNotFoundError:
-        click.echo(
-            "ERROR: 'sf' CLI not found. Install it from "
-            "https://developer.salesforce.com/tools/salesforcecli or use .env.",
-            err=True,
-        )
-        raise SystemExit(1)
+    return _get_session_from_env()
 
 
 def _get_session_from_env() -> tuple[str, str, dict[str, str]]:
@@ -93,60 +68,6 @@ def _get_session_from_env() -> tuple[str, str, dict[str, str]]:
         )
         raise SystemExit(1)
     return instance_url, access_token, {"alias": "", "username": "", "instance_url": instance_url}
-
-
-def _headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-
-
-def _list_sobjects(instance_url: str, token: str) -> list[dict]:
-    """Fetch the global describe to get the list of all SObjects."""
-    url = f"{instance_url}/services/data/v60.0/sobjects"
-    resp = requests.get(url, headers=_headers(token), timeout=30)
-    resp.raise_for_status()
-    return resp.json()["sobjects"]
-
-
-def _describe_object(instance_url: str, token: str, api_name: str) -> dict:
-    """Fetch full describe for a single SObject."""
-    url = f"{instance_url}/services/data/v60.0/sobjects/{api_name}/describe"
-    resp = requests.get(url, headers=_headers(token), timeout=30)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _normalise(raw: dict) -> dict:
-    """Transform raw Salesforce describe into our cache format."""
-    fields = []
-    for f in raw.get("fields", []):
-        field = {
-            "name": f["name"],
-            "label": f["label"],
-            "type": f["type"].lower(),
-            "required": not f.get("nillable", True) and not f.get("defaultedOnCreate", False),
-            "external_id": f.get("externalId", False),
-            "reference_to": [r for r in (f.get("referenceTo") or [])],
-            "picklist_values": [p["value"] for p in (f.get("picklistValues") or []) if p.get("active")],
-        }
-        fields.append(field)
-
-    child_rels = []
-    for r in raw.get("childRelationships", []):
-        if r.get("childSObject") and r.get("field"):
-            child_rels.append({
-                "child_sobject": r["childSObject"],
-                "field": r["field"],
-                "relationship_name": r.get("relationshipName") or "",
-            })
-
-    return {
-        "name": raw["name"],
-        "label": raw.get("label", raw["name"]),
-        "label_plural": raw.get("labelPlural", ""),
-        "custom": raw.get("custom", False),
-        "fields": fields,
-        "child_relationships": child_rels,
-    }
 
 
 @click.command()
@@ -181,7 +102,7 @@ def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...])
         click.echo(f"Syncing {len(api_names)} specified object(s)...")
     else:
         click.echo("Fetching SObject list...")
-        sobjects = _list_sobjects(instance_url, token)
+        sobjects = sf_api.list_sobjects(instance_url, token)
         api_names = [
             s["name"] for s in sobjects
             if s.get("queryable") and not s["name"].endswith("__History")
@@ -193,14 +114,11 @@ def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...])
     for i, name in enumerate(api_names, 1):
         try:
             click.echo(f"  [{i}/{len(api_names)}] {name}...", nl=False)
-            raw = _describe_object(instance_url, token, name)
-            obj = _normalise(raw)
+            raw = sf_api.describe_object(instance_url, token, name)
+            obj = sf_api.normalise(raw)
             save_object(cache_path, obj)
             synced += 1
             click.echo(" OK")
-        except requests.HTTPError as e:
-            errors.append((name, str(e)))
-            click.echo(f" FAILED ({e})")
         except Exception as e:
             errors.append((name, str(e)))
             click.echo(f" ERROR ({e})")
