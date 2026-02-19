@@ -6,10 +6,10 @@ Deterministic, org-specific Salesforce schema intelligence for LLMs — via MCP.
 
 ### LLMs Don't Know Your Org
 
-Large language models like Claude, GPT-4, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
+Large language models like Claude, GPT-5x, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
 
 **1. Salesforce releases 3 times a year.**
-Salesforce ships major releases in Spring, Summer, and Winter — each introducing new standard objects, deprecated fields, changed relationships, and new Health Cloud or Financial Services Cloud APIs. A model trained in early 2024 knows nothing about Winter 2025 changes. Ask it to write Apex against a new object and it will confidently produce code that does not compile.
+Salesforce ships major releases in Spring, Summer, and Winter — each introducing new standard objects, deprecated fields, changed relationships, and  Industry cloud Objects  such as new Health Cloud or Financial Services Cloud objects. A model trained in early 2024 knows nothing about Winter 2025 changes. Ask it to write Apex against a new object and it will confidently produce code that does not compile.
 
 **2. Every org is different.**
 No two Salesforce orgs share the same schema. A Healthcare org has hundreds of custom objects, client-specific fields on standard objects, industry-specific junction objects, and namespace prefixes from installed managed packages. A Financial Services org has its own custom policy, claim, and account hierarchies. Claude knows the generic product. It does not know YOUR org.
@@ -42,7 +42,7 @@ LLM: [calls get_object_schema("HealthcareProvider__c")]
 
 ## Why MCP
 
-The Model Context Protocol (MCP), open-sourced by Anthropic in 2024 and now governed by the Linux Foundation with backing from OpenAI, Google, and Microsoft, is the universal standard for connecting LLMs to external tools and data. One MCP server works across Claude, GPT-4, Gemini, Cursor, and any other MCP-compatible client. You build the schema intelligence once. Every AI tool your team uses benefits from it.
+The Model Context Protocol (MCP), open-sourced by Anthropic in 2024 and now governed by the Linux Foundation with backing from OpenAI, Google, and Microsoft, is the universal standard for connecting LLMs to external tools and data. One MCP server works across Claude, GPT-5x, Gemini, Cursor, and any other MCP-compatible client. You build the schema intelligence once. Every AI tool your team uses benefits from it.
 
 ## Architecture
 
@@ -351,7 +351,7 @@ asyncio.run(ask("Generate ER diagram for the insurance policy domain"))
 
 **Tool calls:** `search_objects("provider")`, `generate_er_diagram_tool(["HealthcareProvider__c", "ProviderLocation__c"], depth=2)`
 
-**Result:** Mermaid diagram with real org objects, client custom fields included, renders in Claude / Notion / GitHub. Not a generic diagram from training data.
+**Result:** Mermaid diagram with real org objects, client custom fields included, renders in Lucid / Mermaid.live / GitHub. Not a generic diagram from training data.
 
 ### Safe Sandbox-to-Production Migration
 
@@ -475,4 +475,3 @@ If you don't use `--org`, the sync script reads credentials from a `.env` file a
 
 **Phase 3 — Embedding-Based Rename Detection:** Uses sentence-transformers (runs locally, no API cost) to detect when objects or fields were renamed between versions — rather than incorrectly reporting them as a delete + add.
 
-**Phase 4 — Severity Classification:** XGBoost classifier trained on Salesforce release notes to score diff severity more accurately than rules alone. Falls back to rule-based scoring if no model file is present.
