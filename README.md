@@ -10,7 +10,7 @@
 
 ### LLMs Don't Know Your Org
 
-Large language models like Claude, GPT-4, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
+Large language models like Claude, ChatGPT, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
 
 **1. Salesforce releases 3 times a year**
 Salesforce ships major releases in Spring, Summer, and Winter — each introducing new standard objects, deprecated fields, changed relationships, and new Health Cloud or Financial Services Cloud APIs. A model trained in early 2024 knows nothing about Winter 2025 changes. Ask it to write Apex against a new object and it will confidently produce code that does not compile.
