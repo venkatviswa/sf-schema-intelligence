@@ -1,48 +1,86 @@
-# Salesforce Schema Intelligence
+# sf-schema-intelligence
 
-Deterministic, org-specific Salesforce schema intelligence for LLMs — via MCP.
+> Deterministic, org-specific Salesforce schema intelligence for LLMs — via MCP.
+
+![Beta](https://img.shields.io/badge/status-beta-orange) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> **Beta notice:** This project is in active development. It has been tested with Claude Code and Cursor. Integration with other MCP-compatible clients (OpenAI Agents SDK, Gemini, Windsurf) is in progress — connection instructions are provided but feedback on edge cases is welcome. See [Issues](https://github.com/venkatviswa/sf-schema-intelligence/issues) to report anything unexpected.
 
 ## The Problem This Solves
 
 ### LLMs Don't Know Your Org
 
-Large language models like Claude, GPT-5x, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
+Large language models like Claude, GPT-4, and Gemini are trained on data up to a cutoff date. For Salesforce developers and architects, this creates three compounding problems:
 
-**1. Salesforce releases 3 times a year.**
-Salesforce ships major releases in Spring, Summer, and Winter — each introducing new standard objects, deprecated fields, changed relationships, and  Industry cloud Objects  such as new Health Cloud or Financial Services Cloud objects. A model trained in early 2024 knows nothing about Winter 2025 changes. Ask it to write Apex against a new object and it will confidently produce code that does not compile.
+**1. Salesforce releases 3 times a year**
+Salesforce ships major releases in Spring, Summer, and Winter — each introducing new standard objects, deprecated fields, changed relationships, and new Health Cloud or Financial Services Cloud APIs. A model trained in early 2024 knows nothing about Winter 2025 changes. Ask it to write Apex against a new object and it will confidently produce code that does not compile.
 
-**2. Every org is different.**
+**2. Every org is different**
 No two Salesforce orgs share the same schema. A Healthcare org has hundreds of custom objects, client-specific fields on standard objects, industry-specific junction objects, and namespace prefixes from installed managed packages. A Financial Services org has its own custom policy, claim, and account hierarchies. Claude knows the generic product. It does not know YOUR org.
 
-**3. Hallucination compounds with complexity.**
+**3. Hallucination compounds with complexity**
 When an LLM does not know a field name, it guesses plausibly. `ProviderStatus__c` becomes `Status__c`. `InsurancePolicy__c` becomes `Policy__c`. In a SOQL query this is a compile error. In an Apex trigger deployed to production, it is an incident.
 
 ### The Solution
 
 sf-schema-intelligence exports your org's real schema to a local cache and exposes it to any LLM via the Model Context Protocol (MCP). The LLM calls your schema tools before answering — getting accurate, org-specific field names, types, and relationships before writing a single line of code.
 
-**Without sf-schema-intelligence:**
-
 ```
-You: "Write a SOQL query for active Healthcare Providers"
-LLM: SELECT Id, Status__c FROM Provider__c WHERE Status__c = 'Active'
-           ^ wrong field       ^ wrong object name   ^ wrong value
-```
+Without sf-schema-intelligence:
+  You: "Write a SOQL query for active Healthcare Providers"
+  LLM: SELECT Id, Status__c FROM Provider__c WHERE Status__c = 'Active'
+       ^ wrong field       ^ wrong object name   ^ wrong value
 
-**With sf-schema-intelligence:**
-
-```
-You: "Write a SOQL query for active Healthcare Providers"
-LLM: [calls get_object_schema("HealthcareProvider__c")]
-     SELECT Id, ProviderStatus__c, ContractStartDate__c, PrimaryAccount__c
-     FROM HealthcareProvider__c
-     WHERE ProviderStatus__c = 'In Network'
-     ^ exact field from your org              ^ exact picklist value
+With sf-schema-intelligence:
+  You: "Write a SOQL query for active Healthcare Providers"
+  LLM: [calls get_object_schema("HealthcareProvider__c")]
+       SELECT Id, ProviderStatus__c, ContractStartDate__c, PrimaryAccount__c
+       FROM HealthcareProvider__c
+       WHERE ProviderStatus__c = 'In Network'
+       ^ exact field from your org              ^ exact picklist value
 ```
 
-## Why MCP
+### Why MCP
 
-The Model Context Protocol (MCP), open-sourced by Anthropic in 2024 and now governed by the Linux Foundation with backing from OpenAI, Google, and Microsoft, is the universal standard for connecting LLMs to external tools and data. One MCP server works across Claude, GPT-5x, Gemini, Cursor, and any other MCP-compatible client. You build the schema intelligence once. Every AI tool your team uses benefits from it.
+The Model Context Protocol (MCP), open-sourced by Anthropic in 2024 and now governed by the Linux Foundation with backing from OpenAI, Google, and Microsoft, is the universal standard for connecting LLMs to external tools and data. One MCP server works across Claude, GPT-4, Gemini, Cursor, and any other MCP-compatible client. You build the schema intelligence once. Every AI tool your team uses benefits from it.
+
+---
+
+## How This Fits the Salesforce MCP Ecosystem
+
+Salesforce itself ships an official MCP server — [`salesforcecli/mcp`](https://github.com/salesforcecli/mcp) — and it is excellent at what it does. It lets an LLM deploy metadata, run Apex tests, execute SOQL queries, manage scratch orgs, and assist with LWC development. It is built for **developers and DevOps engineers** who need an AI assistant that can take action inside an org.
+
+sf-schema-intelligence occupies a different layer entirely. It is built for **architects and technical leads** who need an AI assistant that deeply understands what an org looks like — before a single line of code is written or deployed.
+
+The distinction maps to two different questions:
+
+| | salesforcecli/mcp | sf-schema-intelligence |
+|---|---|---|
+| Primary question | *What do you want to do to your org?* | *What does your org look like?* |
+| Core persona | Developer, DevOps engineer | Architect, technical lead |
+| Executes actions | Yes — deploy, test, query, manage | No — read-only schema analysis |
+| Schema awareness | None | Full — fields, types, relationships, picklist values |
+| ER diagram generation | No | Yes — Mermaid and PlantUML, depth-controlled |
+| Breaking change detection | No | Yes — BREAKING / NON-BREAKING / INFO |
+| Works offline | No | Yes — local cache, no live org required |
+| Multi-org schema diff | No | Yes — compare any two snapshots |
+
+They are designed to be run side by side. The official server executes; this one understands. A complete AI-assisted Salesforce workflow needs both:
+
+```
+Architect workflow (sf-schema-intelligence):
+  "Compare our sandbox to production schemas"
+  → surfaces 2 BREAKING changes before any deployment is attempted
+
+Developer workflow (salesforcecli/mcp + sf-schema-intelligence):
+  "Fix the breaking field type change, then deploy"
+  → sf-schema-intelligence provides the exact field structure
+  → salesforcecli/mcp executes the deployment and runs the tests
+```
+
+The capability sf-schema-intelligence adds — and that no other Salesforce MCP tool currently provides — is treating the org schema itself as the primary subject of intelligence: indexing it, visualizing it, diffing it across org versions, and surfacing all of it to any LLM in a form that eliminates hallucination at the field level.
+
+---
 
 ## Architecture
 
@@ -71,65 +109,34 @@ The Model Context Protocol (MCP), open-sourced by Anthropic in 2024 and now gove
 +--------------------v--------------------------------+
 |  schema-cache/                                      |
 |  _orgs.json (org registry)                          |
-|  sfsdemo/  Account.json . _index.json . _meta.json  |
 |  prod/     Account.json . _index.json . _meta.json  |
+|  sandbox/  Account.json . _index.json . _meta.json  |
 +-----------------------------------------------------+
 ```
 
-**Dependency rule:** `data ← core ← mcp`. Never reversed. Core modules never import from MCP. This keeps business logic independently testable without running an MCP server.
+Dependency rule: data <- core <- mcp. Never reversed. Core modules never import from MCP. This keeps business logic independently testable without running an MCP server.
 
-### File Structure
-
-```
-sf-schema-intelligence/
-|
-|-- src/
-|   |-- data/
-|   |   +-- schema_cache.py      # Load, save, index snapshots (no MCP, no ML)
-|   |
-|   |-- core/
-|   |   |-- graph.py             # NetworkX relationship graph (no MCP, no ML)
-|   |   |-- diff.py              # Deterministic schema diff (no MCP, no ML)
-|   |   +-- er_diagram.py        # Mermaid + PlantUML renderers (no MCP, no ML)
-|   |
-|   +-- mcp/
-|       +-- server.py            # FastMCP server (thin wrappers, <=10 lines each)
-|
-|-- scripts/
-|   +-- sf_schema_sync.py        # CLI sync from Salesforce REST API
-|
-|-- cli.py                       # Click CLI for local use without Claude
-|-- tests/
-|   |-- conftest.py              # Shared pytest fixtures (snapshot_v1, snapshot_v2)
-|   |-- fixtures/
-|   |   |-- snapshot_v1/         # 6 objects (Account, Contact, CarePlan, etc.)
-|   |   +-- snapshot_v2/         # 7 objects (v1 + CareMetric, with field diffs)
-|   |-- test_diff.py
-|   |-- test_graph.py
-|   |-- test_er_diagram.py
-|   +-- test_multi_org.py
-+-- pyproject.toml
-```
+---
 
 ## Prerequisites
 
-- Python 3.11+
-- A Salesforce org with API access
-- Salesforce CLI (`sf`) for authentication — install from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli)
+* Python 3.11+
+* A Salesforce org with API access
+* Salesforce CLI (`sf`) for authentication — install from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli)
 
 ## Quick Start
 
 ### 1. Install
 
-```bash
-git clone https://github.com/yourname/sf-schema-intelligence
+```
+git clone https://github.com/venkatviswa/sf-schema-intelligence
 cd sf-schema-intelligence
 pip install -e ".[dev]"
 ```
 
 ### 2. Authenticate with Salesforce
 
-```bash
+```
 # Log in via browser (replace alias and URL with your org)
 sf org login web --alias myorg --instance-url https://your-domain.my.salesforce.com
 
@@ -141,7 +148,7 @@ No `.env` file needed when using `--org` — credentials are pulled from the Sal
 
 ### 3. Sync Schema
 
-```bash
+```
 # Sync specific objects using org alias (recommended)
 python scripts/sf_schema_sync.py --org myorg \
   --objects Account --objects Contact --objects Opportunity \
@@ -157,7 +164,7 @@ This creates `schema-cache/myorg/` with one JSON file per object, plus `_index.j
 
 ### 4. Verify
 
-```bash
+```
 # List synced orgs
 python cli.py orgs
 
@@ -173,7 +180,7 @@ python cli.py --org myorg er Account --depth 1 --format mermaid
 
 ### 5. Run Tests
 
-```bash
+```
 python -m pytest tests/ -v
 ```
 
@@ -183,12 +190,12 @@ python -m pytest tests/ -v
 
 All commands accept `--org <alias>` to target a specific org, or `--cache-dir <path>` for a raw directory.
 
-```bash
+```
 # List synced orgs
 python cli.py orgs
 
 # Search for objects by keyword
-python cli.py --org myorg search care --custom-only
+python cli.py --org myorg search provider --custom-only
 
 # Full schema for an object
 python cli.py --org myorg describe Account
@@ -216,7 +223,7 @@ python cli.py --org myorg meta
 
 ### Claude Code
 
-```bash
+```
 claude mcp add salesforce-schema -- python -m src.mcp.server
 ```
 
@@ -323,7 +330,7 @@ asyncio.run(ask("Generate ER diagram for the insurance policy domain"))
 ## MCP Tools
 
 | Tool | Description |
-|------|-------------|
+| --- | --- |
 | `list_orgs` | List all synced orgs and show which is currently active |
 | `switch_org` | Switch the active org for all subsequent queries |
 | `get_object_schema` | Full field definitions and relationships for an object |
@@ -382,7 +389,7 @@ INFO (6): label changes, description updates
 ## Diagram Rendering
 
 | Tool | Support | How to Use |
-|------|---------|------------|
+| --- | --- | --- |
 | Claude Desktop / Code | Native | Renders Mermaid inline automatically |
 | GitHub Markdown | Native | Paste in ` ```mermaid ` block in any .md file |
 | Notion | Native | Insert code block, select Mermaid language |
@@ -398,7 +405,7 @@ Sync multiple orgs and switch between them without restarting the MCP server.
 
 ### Syncing Multiple Orgs
 
-```bash
+```
 # Authenticate and sync each org
 sf org login web --alias prod
 python scripts/sf_schema_sync.py --org prod
@@ -434,14 +441,14 @@ Switched to 'sandbox'. Last synced: 2026-02-19T06:00:04+00:00
 
 ### Switching Orgs in CLI
 
-```bash
+```
 python cli.py --org prod describe Account
 python cli.py --org sandbox describe Account
 ```
 
 ### Comparing Orgs
 
-```bash
+```
 # Via MCP
 compare_schemas("sandbox", "prod")
 
@@ -451,7 +458,7 @@ python cli.py diff ./schema-cache/sandbox ./schema-cache/prod
 
 ### Daily Schema Refresh
 
-```bash
+```
 crontab -e
 # Add one line per org:
 0 7 * * * cd /path/to/sf-schema-intelligence && python scripts/sf_schema_sync.py --org prod >> ~/logs/sf-schema.log 2>&1
@@ -465,7 +472,7 @@ If you don't use `--org`, the sync script reads credentials from a `.env` file a
 ## Phase Roadmap
 
 | Phase | Status | Description |
-|-------|--------|-------------|
+| --- | --- | --- |
 | 1 | Done | Deterministic diff, ER diagrams, MCP tooling |
 | 2 | Planned | Domain auto-discovery via Louvain graph clustering |
 | 3 | Planned | Embedding-based rename detection (local, no API) |
@@ -474,3 +481,11 @@ If you don't use `--org`, the sync script reads credentials from a `.env` file a
 
 **Phase 3 — Embedding-Based Rename Detection:** Uses sentence-transformers (runs locally, no API cost) to detect when objects or fields were renamed between versions — rather than incorrectly reporting them as a delete + add.
 
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+Copyright (c) 2025 Venkat Viswanathan
