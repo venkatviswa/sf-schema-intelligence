@@ -7,10 +7,13 @@ Quick reference for all MCP tools, CLI commands, and common workflows.
 ## Quick Start
 
 ```bash
-# 1. Clone and install dependencies
+# 1. Clone and install (end users)
 git clone https://github.com/venkatviswa/sf-schema-intelligence
 cd sf-schema-intelligence
 pip install -e .
+
+# For contributors (includes pytest, pytest-cov)
+pip install -e ".[dev]"
 
 # 2. Authenticate with Salesforce CLI
 sf org login web --alias myorg --instance-url https://your-domain.my.salesforce.com
@@ -53,10 +56,22 @@ python cli.py --org myorg list
 }
 ```
 
-**Claude Code**:
+**Claude Code** (global):
 ```bash
 claude mcp add salesforce-schema -- python -m src.mcp.server
 ```
+
+**Claude Code** (project-level — recommended for team use):
+```bash
+# From inside your project directory
+claude mcp add --scope project salesforce-schema -- python -m src.mcp.server
+# Creates/updates .claude/mcp.json — commit this file to share with the team
+```
+
+> **Troubleshooting setup issues:**
+> - `ModuleNotFoundError: No module named 'setuptools.backends'` — run `pip install --upgrade setuptools` then retry
+> - `sf: command not found` — install the Salesforce CLI: https://developer.salesforce.com/tools/salesforcecli
+> - `No schema cache found` — run `python scripts/sf_schema_sync.py --org <alias>` first
 
 ---
 
@@ -68,7 +83,9 @@ claude mcp add salesforce-schema -- python -m src.mcp.server
 |------|-----------|-------------|
 | `list_orgs` | — | Show all synced orgs, mark which is active |
 | `switch_org` | `org` (str) | Switch active org for all subsequent queries |
-| `refresh_object` | `object_name` (str) | Re-fetch a single object's schema from Salesforce |
+| `refresh_object` | `object_name` (str) | Re-fetch a single object's schema from Salesforce, update cache, and rebuild the index — no full sync needed |
+
+> **Note:** All MCP tool parameters are passed as JSON by MCP clients. The Python-style keyword syntax below (`key_fields_only=True`) is for readability only.
 
 ```
 > list_orgs
@@ -87,7 +104,7 @@ Refreshed 'Account' from sandbox. 68 fields, 42 child relationships.
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `get_object_schema` | `object_name` (str), `key_fields_only` (bool, default=False) | Full or key-only field definitions |
+| `get_object_schema` | `object_name` (str), `key_fields_only` (bool, default=False) | Full or key-only field definitions. Use `key_fields_only=True` for a fast preview before generating ER diagrams on large objects. |
 | `search_objects` | `keyword` (str), `custom_only` (bool, default=False) | Find objects by name or label |
 | `list_all_objects` | `custom_only` (bool, default=False) | List all cached objects |
 | `get_object_relationships` | `object_name` (str) | Outbound lookups + inbound child relationships |
@@ -127,8 +144,8 @@ Found 3 object(s):
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `generate_er_diagram_tool` | `root_objects` (list), `depth` (int=1), `direction` (str="both"), `include_fields` (bool=True), `field_filter` (str="relationships"), `format` (str="mermaid") | ER diagram |
-| `generate_hierarchy_diagram_tool` | `object_name` (str), `max_levels` (int=3), `format` (str="mermaid") | Self-referencing hierarchy diagram |
+| `generate_er_diagram_tool` | `root_objects` (list), `depth` (int, default=1), `direction` (str, default="both"), `include_fields` (bool, default=True), `field_filter` (str, default="relationships"), `format` (str, default="mermaid") | ER diagram from real schema cache |
+| `generate_hierarchy_diagram_tool` | `object_name` (str), `max_levels` (int, default=3), `format` (str, default="mermaid") | Self-referencing hierarchy diagram |
 
 ```
 > generate_er_diagram_tool(["Account", "Contact"], depth=2)
@@ -145,29 +162,33 @@ erDiagram
 
 **Diagram parameters explained:**
 
-| Parameter | Values | Use When |
-|-----------|--------|----------|
-| `depth` | 0-3 | 0 = just the object, 1 = immediate neighbors, 2+ = wider graph |
-| `direction` | `both`, `outbound`, `inbound` | `outbound` = what this object points to, `inbound` = what points to it |
-| `field_filter` | `relationships`, `required`, `all` | `relationships` = FK fields only (cleanest), `all` = every field (verbose) |
-| `format` | `mermaid`, `plantuml` | Mermaid for GitHub/Claude/Notion, PlantUML for draw.io/IntelliJ |
+| Parameter | Values | Default | Use When |
+|-----------|--------|---------|----------|
+| `depth` | 0-3 | 1 | 0 = just the object, 1 = immediate neighbors, 2+ = wider graph |
+| `direction` | `both`, `outbound`, `inbound` | `both` | `outbound` = what this object points to, `inbound` = what points to it |
+| `field_filter` | `relationships`, `required`, `all` | `relationships` | `relationships` = FK fields only (cleanest), `all` = every field (verbose) |
+| `format` | `mermaid`, `plantuml` | `mermaid` | Mermaid for GitHub/Claude/Notion, PlantUML for draw.io/IntelliJ |
 
 ### Schema Comparison
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `compare_schemas` | `cache_dir_a` (str), `cache_dir_b` (str) | Diff two snapshots — accepts org aliases or paths |
-| `get_schema_meta` | `cache_dir` (str, optional) | Cache metadata (last sync time, object count) |
+| `get_schema_meta` | `cache_dir` (str, optional) | Cache metadata (last sync time, object count). Defaults to active org. |
 
 ```
 > compare_schemas("sandbox", "prod")
 Schema Diff Report
-  Added objects: CustomObj__c
-  Removed objects: (none)
-  Modified objects:
-    Account: 2 field changes (1 BREAKING)
-      - REMOVED: Legacy_Field__c (BREAKING)
-      - ADDED: New_Field__c (non-breaking)
+==================
+
+BREAKING (1):
+  Account.Legacy_Field__c   FIELD REMOVED
+
+NON-BREAKING (2):
+  Account.New_Field__c      FIELD ADDED
+  CustomObj__c              OBJECT ADDED
+
+INFO (0):
 
 > get_schema_meta()
 {
@@ -257,8 +278,9 @@ python scripts/sf_schema_sync.py --org prod --objects Account --objects Contact
 # Via CLI (use directory paths)
 python cli.py diff ./schema-cache/sandbox ./schema-cache/prod
 
-# JSON output for programmatic use
+# JSON output to stdout — pipe to a file or jq for programmatic use
 python cli.py diff ./schema-cache/sandbox ./schema-cache/prod --json-output
+# Example: python cli.py diff ./schema-cache/sandbox ./schema-cache/prod --json-output > diff.json
 ```
 
 ### Generate ER Diagram for a Domain
@@ -275,6 +297,10 @@ python cli.py diff ./schema-cache/sandbox ./schema-cache/prod --json-output
 
 # PlantUML format for draw.io
 > generate_er_diagram_tool(["Case"], depth=1, format="plantuml")
+
+# Quick shape preview before a full ER diagram on a large object
+> get_object_schema("WorkOrder", key_fields_only=True)
+> generate_er_diagram_tool(["WorkOrder"], depth=2)
 ```
 
 ---
@@ -301,15 +327,17 @@ python cli.py --org prod describe Account
 # Show relationships
 python cli.py --org prod relationships Account
 
-# Generate ER diagram
+# Generate ER diagram (default depth=1)
 python cli.py --org prod er Account Contact --depth 2 --format mermaid
 python cli.py --org prod er WorkOrder --depth 1 --direction outbound
 
-# Generate hierarchy diagram
+# Generate hierarchy diagram (default max-levels=3)
 python cli.py --org prod hierarchy Account --max-levels 4
 
 # Compare two org schemas
 python cli.py diff ./schema-cache/sandbox ./schema-cache/prod
+
+# Compare and write JSON output to stdout (pipe or redirect as needed)
 python cli.py diff ./schema-cache/sandbox ./schema-cache/prod --json-output
 
 # View cache metadata
@@ -334,14 +362,16 @@ python scripts/sf_schema_sync.py [OPTIONS]
 # Full sync using org alias (recommended)
 python scripts/sf_schema_sync.py --org prod
 
-# Sync specific objects only (fast)
+# Sync specific objects only (fast, useful during development)
 python scripts/sf_schema_sync.py --org prod --objects Account --objects Contact --objects Opportunity
 
 # Legacy mode using env vars (no --org)
+# Note: legacy mode writes directly to SF_SCHEMA_CACHE root — does not create
+# a named org entry in _orgs.json. Use --org for multi-org setups.
 SF_INSTANCE_URL=https://... SF_ACCESS_TOKEN=tok... python scripts/sf_schema_sync.py
 
-# Daily cron job
-0 6 * * * cd /path/to/sf-schema-intelligence && python scripts/sf_schema_sync.py --org prod
+# Daily cron job — activate venv first to ensure correct Python and dependencies
+0 6 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org prod
 ```
 
 ---
