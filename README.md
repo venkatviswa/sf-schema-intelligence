@@ -124,6 +124,8 @@ Dependency rule: data <- core <- mcp. Never reversed. Core modules never import 
 * A Salesforce org with API access
 * Salesforce CLI (`sf`) for authentication — install from [developer.salesforce.com/tools/salesforcecli](https://developer.salesforce.com/tools/salesforcecli)
 
+> **Note:** `pip install -e .` (step 1 below) installs all required Python packages: `fastmcp`, `click`, `requests`, `networkx`, and `python-dotenv`. You must run this before using the sync script or CLI.
+
 ## Quick Start
 
 ### 1. Install

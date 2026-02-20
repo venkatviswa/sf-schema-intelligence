@@ -7,13 +7,18 @@ Quick reference for all MCP tools, CLI commands, and common workflows.
 ## Quick Start
 
 ```bash
-# 1. Authenticate with Salesforce CLI
+# 1. Clone and install dependencies
+git clone https://github.com/venkatviswa/sf-schema-intelligence
+cd sf-schema-intelligence
+pip install -e .
+
+# 2. Authenticate with Salesforce CLI
 sf org login web --alias myorg --instance-url https://your-domain.my.salesforce.com
 
-# 2. Sync schema to local cache
+# 3. Sync schema to local cache
 python scripts/sf_schema_sync.py --org myorg
 
-# 3. Verify
+# 4. Verify
 python cli.py orgs
 python cli.py --org myorg list
 ```
