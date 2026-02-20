@@ -103,9 +103,10 @@ def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...])
     else:
         click.echo("Fetching SObject list...")
         sobjects = sf_api.list_sobjects(instance_url, token)
+        SKIP_SUFFIXES = ("__History", "__Feed", "__Share", "Feed", "History", "Share")
         api_names = [
             s["name"] for s in sobjects
-            if s.get("queryable") and not s["name"].endswith("__History")
+            if s.get("queryable") and not s["name"].endswith(SKIP_SUFFIXES)
         ]
         click.echo(f"Found {len(api_names)} queryable objects.")
 
