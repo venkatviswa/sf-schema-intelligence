@@ -14,7 +14,12 @@ from fastmcp import FastMCP
 from src.core import diff, er_diagram, graph
 from src.data import schema_cache, sf_api
 
-CACHE_ROOT = os.environ.get("SF_SCHEMA_CACHE", "./schema-cache")
+# CACHE_ROOT = os.environ.get("SF_SCHEMA_CACHE", "./schema-cache")
+
+CACHE_ROOT = os.environ.get(
+    "SF_SCHEMA_CACHE",
+    str(Path(__file__).parent.parent.parent / "schema-cache")
+)
 
 # ── Multi-org state ──────────────────────────────────────────────────────────
 
