@@ -62,6 +62,8 @@ The distinction maps to two different questions:
 | Schema awareness | None | Full — fields, types, relationships, picklist values |
 | ER diagram generation | No | Yes — Mermaid and PlantUML, depth-controlled |
 | Breaking change detection | No | Yes — BREAKING / NON-BREAKING / INFO |
+| Data integrity workbooks | No | Yes — Markdown reports with field dictionaries, metrics |
+| Daily change tracking | No | Yes — snapshot archival + automated diff reports |
 | Works offline | No | Yes — local cache, no live org required |
 | Multi-org schema diff | No | Yes — compare any two snapshots |
 
@@ -97,7 +99,7 @@ The capability sf-schema-intelligence adds — and that no other Salesforce MCP 
                      |  Python imports
 +--------------------v--------------------------------+
 |  src/core/                                          |
-|  diff.py . graph.py . er_diagram.py                 |
+|  diff.py . graph.py . er_diagram.py . workbook.py   |
 |  Pure Python -- no MCP, no ML, fully testable       |
 +--------------------+--------------------------------+
                      |  Python imports
@@ -186,7 +188,7 @@ python cli.py --org myorg er Account --depth 1 --format mermaid
 python -m pytest tests/ -v
 ```
 
-70 tests covering the graph builder, diff engine, ER diagram renderers, and multi-org support.
+127 tests covering the graph builder, diff engine, ER diagram renderers, workbook generation, snapshot archival, and multi-org support.
 
 ## CLI Reference
 
@@ -219,6 +221,14 @@ python cli.py --org myorg list --custom-only
 
 # Show cache metadata (last sync, org info)
 python cli.py --org myorg meta
+
+# Generate data integrity workbook
+python cli.py --org myorg workbook --output workbook.md
+python cli.py --org myorg workbook --objects Account --objects Contact --no-picklists
+
+# Diff report (compare current schema vs last archived snapshot)
+python cli.py --org myorg diff-report
+python cli.py --org myorg diff-report --output changes.md
 ```
 
 ## Connecting to LLM Clients
@@ -278,7 +288,7 @@ Add to `claude_desktop_config.json` (found at `~/Library/Application Support/Cla
 }
 ```
 
-Restart Claude Desktop. You will see "salesforce-schema" in the tools panel with 10 available tools.
+Restart Claude Desktop. You will see "salesforce-schema" in the tools panel with 13 available tools.
 
 ### OpenAI
 
@@ -343,6 +353,9 @@ asyncio.run(ask("Generate ER diagram for the insurance policy domain"))
 | `generate_hierarchy_diagram_tool` | Hierarchy diagram for self-referencing objects (e.g. Account → ParentId) |
 | `compare_schemas` | Structured diff between two snapshots or orgs with severity classification |
 | `get_schema_meta` | Cache metadata (last sync time, org info, object count) |
+| `generate_workbook_tool` | Generate a Markdown data integrity workbook (object inventory, field dictionary, relationship map, metrics) |
+| `generate_diff_report` | Compare current schema against the most recent archived snapshot and return a Markdown diff report |
+| `refresh_object` | Re-fetch a single object's schema from Salesforce without a full sync |
 
 ## Use Case Examples
 
@@ -379,6 +392,22 @@ NON-BREAKING (14):
 
 INFO (6): label changes, description updates
 ```
+
+### Automated Data Integrity Workbook
+
+**Prompt:** "Generate a data integrity workbook for our org"
+
+**Tool calls:** `generate_workbook_tool()`
+
+**Result:** Complete Markdown document with executive summary, object inventory, field dictionary with picklist values, relationship map, and aggregate metrics — ready to share with leadership or audit teams.
+
+### Daily Change Tracking
+
+**Prompt:** "What changed in our schema since yesterday?"
+
+**Tool calls:** `generate_diff_report()`
+
+**Result:** Markdown diff report showing added/removed/modified objects and fields, with severity classification (BREAKING / NON-BREAKING / INFO) and before/after timestamps.
 
 ### Hierarchy Visualization
 
@@ -422,6 +451,9 @@ This creates:
 schema-cache/
   _orgs.json          # registry: {prod: {...}, sandbox: {...}}
   prod/               # full schema cache
+    _snapshots/       # archived snapshots (created by --archive flag)
+      2026-03-04/     # dated subdirectory
+      2026-03-03/
   sandbox/            # targeted schema cache
 ```
 
@@ -460,11 +492,23 @@ python cli.py diff ./schema-cache/sandbox ./schema-cache/prod
 
 ### Daily Schema Refresh
 
+Use `--archive` to save a snapshot before each sync — this enables daily diff reports to track what changed.
+
 ```
 crontab -e
-# Add one line per org:
-0 7 * * * cd /path/to/sf-schema-intelligence && python scripts/sf_schema_sync.py --org prod >> ~/logs/sf-schema.log 2>&1
-0 7 * * * cd /path/to/sf-schema-intelligence && python scripts/sf_schema_sync.py --org sandbox >> ~/logs/sf-schema.log 2>&1
+# Add one line per org (--archive saves the current snapshot before syncing):
+0 7 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org prod --archive >> ~/logs/sf-schema.log 2>&1
+0 7 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org sandbox --archive >> ~/logs/sf-schema.log 2>&1
+```
+
+Then view what changed:
+
+```
+# Via MCP
+> generate_diff_report()
+
+# Via CLI
+python cli.py --org prod diff-report --output changes.md
 ```
 
 ### Legacy Single-Org Mode

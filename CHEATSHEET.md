@@ -169,12 +169,13 @@ erDiagram
 | `field_filter` | `relationships`, `required`, `all` | `relationships` | `relationships` = FK fields only (cleanest), `all` = every field (verbose) |
 | `format` | `mermaid`, `plantuml` | `mermaid` | Mermaid for GitHub/Claude/Notion, PlantUML for draw.io/IntelliJ |
 
-### Schema Comparison
+### Schema Comparison & Change Tracking
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
 | `compare_schemas` | `cache_dir_a` (str), `cache_dir_b` (str) | Diff two snapshots — accepts org aliases or paths |
 | `get_schema_meta` | `cache_dir` (str, optional) | Cache metadata (last sync time, object count). Defaults to active org. |
+| `generate_diff_report` | `org` (str, optional) | Compare current schema against most recent archive — returns Markdown diff report |
 
 ```
 > compare_schemas("sandbox", "prod")
@@ -198,6 +199,40 @@ INFO (0):
   "objects_failed": 0,
   "api_version": "v60.0"
 }
+
+> generate_diff_report()
+# Schema Diff Report
+**Org:** https://mycompany.my.salesforce.com
+**Before:** 2026-03-04T06:00:00+00:00
+**After:** 2026-03-05T06:00:00+00:00
+## Summary
+| Metric | Count |
+...
+```
+
+### Documentation & Reporting
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `generate_workbook_tool` | `objects` (list, optional), `include_picklists` (bool, default=True) | Generate a Markdown data integrity workbook with executive summary, object inventory, field dictionary, relationship map, and aggregate metrics |
+
+```
+> generate_workbook_tool()
+# Data Integrity Workbook
+**Org:** https://mycompany.my.salesforce.com
+**Synced:** 2026-03-05T06:00:00+00:00
+| Metric | Count |
+|--------|-------|
+| Total Objects | 64 |
+| Standard Objects | 42 |
+| Custom Objects | 22 |
+| Total Fields | 1847 |
+## Object Inventory
+...
+
+> generate_workbook_tool(["Account", "Contact"], include_picklists=False)
+# Data Integrity Workbook (filtered to 2 objects)
+...
 ```
 
 ---
@@ -267,6 +302,63 @@ Or sync specific objects from the terminal:
 ```bash
 # Sync only Account and Contact
 python scripts/sf_schema_sync.py --org prod --objects Account --objects Contact
+```
+
+### Generate Data Integrity Workbook
+
+```
+# Via MCP (simplest)
+> generate_workbook_tool()
+
+# Specific objects only
+> generate_workbook_tool(["Account", "Contact", "Opportunity"])
+
+# Without picklist values (shorter output)
+> generate_workbook_tool(include_picklists=False)
+```
+
+Or via CLI:
+
+```bash
+# Full workbook to stdout
+python cli.py --org prod workbook
+
+# Write to file
+python cli.py --org prod workbook --output workbook.md
+
+# Specific objects, no picklists
+python cli.py --org prod workbook --objects Account --objects Contact --no-picklists
+```
+
+### Daily Diff Reports (Change Tracking)
+
+```bash
+# Step 1: Archive current snapshot before syncing
+python scripts/sf_schema_sync.py --org prod --archive
+
+# Step 2: After schema changes, sync again with --archive
+python scripts/sf_schema_sync.py --org prod --archive
+
+# Step 3: View what changed
+python cli.py --org prod diff-report
+python cli.py --org prod diff-report --output changes.md
+python cli.py --org prod diff-report --json-output
+```
+
+Via MCP:
+
+```
+> generate_diff_report()
+# Schema Diff Report
+**Before:** 2026-03-04T06:00:00+00:00
+**After:** 2026-03-05T06:00:00+00:00
+...
+```
+
+**Daily cron job (archive + sync):**
+
+```bash
+0 6 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org prod --archive
 ```
 
 ### Compare Sandbox vs Production
@@ -342,6 +434,16 @@ python cli.py diff ./schema-cache/sandbox ./schema-cache/prod --json-output
 
 # View cache metadata
 python cli.py --org prod meta
+
+# Generate data integrity workbook
+python cli.py --org prod workbook
+python cli.py --org prod workbook --output workbook.md
+python cli.py --org prod workbook --objects Account --objects Contact --no-picklists
+
+# Diff report (compare current vs last archived snapshot)
+python cli.py --org prod diff-report
+python cli.py --org prod diff-report --output changes.md
+python cli.py --org prod diff-report --json-output
 ```
 
 ---
@@ -357,6 +459,7 @@ python scripts/sf_schema_sync.py [OPTIONS]
 | `--org <alias>` | Salesforce CLI org alias (recommended). Gets credentials via `sf org display`. |
 | `--cache-dir <path>` | Explicit cache directory. Auto-resolved from `--org` if omitted. |
 | `--objects <name>` | Sync specific objects only (repeatable). Omit to sync all queryable objects. |
+| `--archive` | Archive the current snapshot before syncing (for daily diff reports). |
 
 ```bash
 # Full sync using org alias (recommended)
@@ -365,13 +468,16 @@ python scripts/sf_schema_sync.py --org prod
 # Sync specific objects only (fast, useful during development)
 python scripts/sf_schema_sync.py --org prod --objects Account --objects Contact --objects Opportunity
 
+# Archive current snapshot before syncing (for change tracking)
+python scripts/sf_schema_sync.py --org prod --archive
+
 # Legacy mode using env vars (no --org)
 # Note: legacy mode writes directly to SF_SCHEMA_CACHE root — does not create
 # a named org entry in _orgs.json. Use --org for multi-org setups.
 SF_INSTANCE_URL=https://... SF_ACCESS_TOKEN=tok... python scripts/sf_schema_sync.py
 
-# Daily cron job — activate venv first to ensure correct Python and dependencies
-0 6 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org prod
+# Daily cron job with archive (recommended for change tracking)
+0 6 * * * cd /path/to/sf-schema-intelligence && source .venv/bin/activate && python scripts/sf_schema_sync.py --org prod --archive
 ```
 
 ---
@@ -397,6 +503,13 @@ schema-cache/
     Opportunity.json
     _index.json              # summary: name, label, custom, field_count
     _meta.json               # sync timestamp, instance URL, counts
+    _snapshots/              # archived snapshots (created by --archive flag)
+      2026-03-04/            # dated subdirectory per archive
+        Account.json
+        _index.json
+        _meta.json
+      2026-03-03/
+        ...
   sandbox/
     Account.json
     _index.json
