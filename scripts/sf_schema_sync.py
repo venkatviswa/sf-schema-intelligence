@@ -28,7 +28,9 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.data import sf_api
-from src.data.schema_cache import build_index, save_meta, save_object, load_orgs, save_orgs
+from src.data.schema_cache import (
+    archive_snapshot, build_index, load_orgs, save_meta, save_object, save_orgs,
+)
 
 
 def _get_session_for_org(org_alias: str | None = None) -> tuple[str, str, dict[str, str]]:
@@ -84,7 +86,11 @@ def _get_session_from_env() -> tuple[str, str, dict[str, str]]:
     multiple=True,
     help="Specific object API names to sync. Omit to sync all queryable objects.",
 )
-def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...]) -> None:
+@click.option(
+    "--archive", is_flag=True, default=False,
+    help="Archive the current snapshot before syncing (for daily diff reports).",
+)
+def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...], archive: bool) -> None:
     """Sync Salesforce schema to a local JSON cache."""
     instance_url, token, org_info = _get_session_for_org(org_alias)
 
@@ -96,6 +102,14 @@ def sync(org_alias: str | None, cache_dir: str | None, objects: tuple[str, ...])
         cache_path = Path(cache_root) / org_alias
     else:
         cache_path = Path(cache_root)
+
+    # Archive existing snapshot before overwriting
+    if archive and cache_path.exists():
+        try:
+            archive_dir = archive_snapshot(cache_path)
+            click.echo(f"Archived current snapshot to {archive_dir}")
+        except (FileNotFoundError, ValueError) as e:
+            click.echo(f"Skipping archive: {e}")
 
     if objects:
         api_names = list(objects)

@@ -364,3 +364,93 @@ def compare_snapshots(
     }
 
     return result
+
+
+# ── Markdown report ──────────────────────────────────────────────────────────
+
+def as_markdown_report(
+    result: DiffResult,
+    meta_before: dict[str, Any] | None = None,
+    meta_after: dict[str, Any] | None = None,
+) -> str:
+    """Render a DiffResult as a Markdown document.
+
+    Args:
+        result: The diff result to render.
+        meta_before: ``_meta.json`` from the "before" snapshot.
+        meta_after: ``_meta.json`` from the "after" snapshot.
+
+    Returns:
+        Complete Markdown string.
+    """
+    lines = ["# Schema Diff Report", ""]
+
+    # Date range
+    before_date = (meta_before or {}).get("synced_at", "Unknown")
+    after_date = (meta_after or {}).get("synced_at", "Unknown")
+    org_url = (meta_after or meta_before or {}).get("instance_url", "Unknown")
+    lines.append(f"**Org:** {org_url}")
+    lines.append(f"**Before:** {before_date}")
+    lines.append(f"**After:** {after_date}")
+    lines.append("")
+
+    # Summary table
+    lines.append("## Summary")
+    lines.append("")
+    lines.append("| Metric | Count |")
+    lines.append("|--------|-------|")
+    for key, val in result.summary.items():
+        label = key.replace("_", " ").title()
+        lines.append(f"| {label} | {val} |")
+    lines.append("")
+
+    # No changes
+    total = result.summary.get("total_field_changes", 0)
+    obj_added = len(result.added_objects)
+    obj_removed = len(result.removed_objects)
+    if total == 0 and obj_added == 0 and obj_removed == 0:
+        lines.append("**No changes detected.**")
+        return "\n".join(lines) + "\n"
+
+    # Breaking changes
+    if result.breaking_candidates:
+        lines.append("## Breaking Changes")
+        lines.append("")
+        lines.append("| Object | Field | Change | Old | New |")
+        lines.append("|--------|-------|--------|-----|-----|")
+        for c in result.breaking_candidates:
+            lines.append(f"| {c.object_name} | {c.field_name} | {c.change_type} | {c.old_value} | {c.new_value} |")
+        lines.append("")
+
+    # Added objects
+    if result.added_objects:
+        lines.append("## Added Objects")
+        lines.append("")
+        for name in sorted(result.added_objects):
+            lines.append(f"- {name}")
+        lines.append("")
+
+    # Removed objects
+    if result.removed_objects:
+        lines.append("## Removed Objects")
+        lines.append("")
+        for name in sorted(result.removed_objects):
+            lines.append(f"- {name}")
+        lines.append("")
+
+    # Modified objects
+    if result.modified_objects:
+        lines.append("## Modified Objects")
+        lines.append("")
+        for obj_name in sorted(result.modified_objects):
+            obj_diff = result.modified_objects[obj_name]
+            changes = obj_diff.all_changes
+            lines.append(f"### {obj_name} ({len(changes)} change{'s' if len(changes) != 1 else ''})")
+            lines.append("")
+            lines.append("| Field | Change | Severity | Old | New |")
+            lines.append("|-------|--------|----------|-----|-----|")
+            for c in changes:
+                lines.append(f"| {c.field_name} | {c.change_type} | {c.severity} | {c.old_value} | {c.new_value} |")
+            lines.append("")
+
+    return "\n".join(lines) + "\n"

@@ -8,6 +8,7 @@ modules and the sync script.  No MCP, no ML — pure data I/O.
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -175,6 +176,84 @@ def resolve_org_cache_dir(cache_root: str | Path, org_alias: str) -> Path:
     if org_alias in orgs:
         return Path(orgs[org_alias]["cache_dir"])
     return cache_root / org_alias
+
+
+# ── Snapshot archival ─────────────────────────────────────────────────────────
+
+def archive_snapshot(cache_dir: str | Path, archive_root: str | Path | None = None) -> Path:
+    """Copy the current cache to a dated subdirectory.
+
+    Archives all JSON files from *cache_dir* into
+    ``<archive_root>/<YYYY-MM-DD>/``.  If *archive_root* is ``None``,
+    defaults to ``<cache_dir>/_snapshots/``.
+
+    Returns:
+        Path to the newly created archive directory.
+
+    Raises:
+        FileNotFoundError: If *cache_dir* does not exist.
+        ValueError: If *cache_dir* has no ``_meta.json``.
+    """
+    cache_dir = Path(cache_dir)
+    if not cache_dir.exists():
+        raise FileNotFoundError(f"Cache directory not found: {cache_dir}")
+
+    meta = load_meta(cache_dir)
+    if meta is None:
+        raise ValueError(f"No _meta.json found in {cache_dir} — nothing to archive")
+
+    if archive_root is None:
+        archive_root = cache_dir / "_snapshots"
+    archive_root = Path(archive_root)
+
+    # Use synced_at date for directory name, fall back to today
+    synced_at = meta.get("synced_at", "")
+    try:
+        date_str = synced_at[:10]
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except (ValueError, IndexError):
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    archive_dir = archive_root / date_str
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    for json_file in cache_dir.glob("*.json"):
+        shutil.copy2(json_file, archive_dir / json_file.name)
+
+    return archive_dir
+
+
+def load_latest_archive(
+    cache_dir: str | Path,
+    archive_root: str | Path | None = None,
+) -> tuple[Path | None, dict[str, dict[str, Any]]]:
+    """Load the most recent archived snapshot.
+
+    Finds the latest dated subdirectory in *archive_root* and loads it.
+
+    Returns:
+        ``(archive_path, snapshot_dict)``.
+        ``(None, {})`` if no archives exist.
+    """
+    cache_dir = Path(cache_dir)
+    if archive_root is None:
+        archive_root = cache_dir / "_snapshots"
+    archive_root = Path(archive_root)
+
+    if not archive_root.exists():
+        return None, {}
+
+    dated_dirs = sorted(
+        [d for d in archive_root.iterdir() if d.is_dir()],
+        key=lambda d: d.name,
+        reverse=True,
+    )
+    if not dated_dirs:
+        return None, {}
+
+    latest = dated_dirs[0]
+    snapshot = load_snapshot(latest)
+    return latest, snapshot
 
 
 def is_stale(cache_dir: str | Path, hours: int = 24) -> bool:

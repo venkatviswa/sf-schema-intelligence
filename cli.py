@@ -19,7 +19,7 @@ import sys
 
 import click
 
-from src.core import diff, er_diagram, graph
+from src.core import diff, er_diagram, graph, workbook
 from src.data import schema_cache
 
 CACHE_ROOT = os.environ.get("SF_SCHEMA_CACHE", "./schema-cache")
@@ -211,6 +211,61 @@ def orgs() -> None:
     click.echo(f"{len(org_map)} org(s):")
     for alias, info in sorted(org_map.items()):
         click.echo(f"  {alias}: {info['instance_url']} ({info.get('username', '')})")
+
+
+@cli.command()
+@click.option("--objects", multiple=True, help="Restrict to specific objects (repeatable).")
+@click.option("--include-picklists/--no-picklists", default=True,
+              help="Include picklist values in field dictionary.")
+@click.option("--output", "output_path", default=None, help="Write to file instead of stdout.")
+@click.pass_context
+def workbook_cmd(ctx: click.Context, objects: tuple[str, ...], include_picklists: bool, output_path: str | None) -> None:
+    """Generate a Markdown data integrity workbook."""
+    cache_dir = ctx.obj["cache_dir"]
+    snapshot = schema_cache.load_snapshot(cache_dir)
+    index = schema_cache.load_index(cache_dir)
+    meta = schema_cache.load_meta(cache_dir)
+    obj_list = list(objects) if objects else None
+    md = workbook.generate_workbook(snapshot, index, meta, obj_list, include_picklists)
+    if output_path:
+        from pathlib import Path
+        Path(output_path).write_text(md)
+        click.echo(f"Workbook written to {output_path}")
+    else:
+        click.echo(md)
+
+
+# Register with the name "workbook" (Click doesn't allow hyphens via decorator)
+workbook_cmd.name = "workbook"
+
+
+@cli.command(name="diff-report")
+@click.option("--archive-dir", default=None, help="Path to archive directory (default: _snapshots/).")
+@click.option("--output", "output_path", default=None, help="Write to file instead of stdout.")
+@click.option("--json-output", is_flag=True, help="Output raw diff as JSON instead of Markdown.")
+@click.pass_context
+def diff_report(ctx: click.Context, archive_dir: str | None, output_path: str | None, json_output: bool) -> None:
+    """Compare current schema against the most recent archive."""
+    cache_dir = ctx.obj["cache_dir"]
+    archive_path, archive_snap = schema_cache.load_latest_archive(cache_dir, archive_dir)
+    if archive_path is None:
+        click.echo("No archived snapshots found. Run sync with --archive first:", err=True)
+        click.echo("  python scripts/sf_schema_sync.py --org <alias> --archive", err=True)
+        raise SystemExit(1)
+    current_snap = schema_cache.load_snapshot(cache_dir)
+    result = diff.compare_snapshots(archive_snap, current_snap)
+    if json_output:
+        click.echo(json.dumps(result.as_dict(), indent=2))
+    else:
+        meta_before = schema_cache.load_meta(archive_path)
+        meta_after = schema_cache.load_meta(cache_dir)
+        md = diff.as_markdown_report(result, meta_before, meta_after)
+        if output_path:
+            from pathlib import Path
+            Path(output_path).write_text(md)
+            click.echo(f"Diff report written to {output_path}")
+        else:
+            click.echo(md)
 
 
 if __name__ == "__main__":

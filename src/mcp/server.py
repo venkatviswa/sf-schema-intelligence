@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from src.core import diff, er_diagram, graph
+from src.core import diff, er_diagram, graph, workbook
 from src.data import schema_cache, sf_api
 
 # CACHE_ROOT = os.environ.get("SF_SCHEMA_CACHE", "./schema-cache")
@@ -242,6 +242,46 @@ def get_schema_meta(cache_dir: str | None = None) -> str:
         return "No schema cache found. Run sf_schema_sync.py first."
     import json
     return json.dumps(meta, indent=2)
+
+
+@mcp.tool
+def generate_workbook_tool(
+    objects: list[str] | None = None,
+    include_picklists: bool = True,
+) -> str:
+    """Generate a Markdown data integrity workbook from the schema cache.
+
+    Includes executive summary, object inventory, field dictionary,
+    relationship map, and aggregate metrics.
+    """
+    cache_dir = _get_cache_dir()
+    snapshot = schema_cache.load_snapshot(cache_dir)
+    index = schema_cache.load_index(cache_dir)
+    meta = schema_cache.load_meta(cache_dir)
+    return workbook.generate_workbook(snapshot, index, meta, objects, include_picklists)
+
+
+@mcp.tool
+def generate_diff_report(org: str | None = None) -> str:
+    """Compare current schema against the most recent archive and return a Markdown diff report.
+
+    Run 'python scripts/sf_schema_sync.py --org <alias> --archive' first to create archives.
+    """
+    if org:
+        cache_dir = _resolve_cache_dir(org)
+    else:
+        cache_dir = _get_cache_dir()
+    archive_path, archive_snap = schema_cache.load_latest_archive(cache_dir)
+    if archive_path is None:
+        return (
+            "No archived snapshots found. Run sync with --archive first:\n"
+            "  python scripts/sf_schema_sync.py --org <alias> --archive"
+        )
+    current_snap = schema_cache.load_snapshot(cache_dir)
+    result = diff.compare_snapshots(archive_snap, current_snap)
+    meta_before = schema_cache.load_meta(archive_path)
+    meta_after = schema_cache.load_meta(cache_dir)
+    return diff.as_markdown_report(result, meta_before, meta_after)
 
 
 # ── Helpers (not tools) ──────────────────────────────────────────────────────
